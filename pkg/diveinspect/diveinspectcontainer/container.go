@@ -57,7 +57,7 @@ func New(deps Deps) *Container {
 	)
 
 	visionSvc := diveinspectsrv.NewVisionService(
-		openaiClient,
+		&openaiClient,
 		deps.FileSystem,
 		inspectionRepo,
 		findingRepo,

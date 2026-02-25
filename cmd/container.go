@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/Abraxas-365/divi/pkg/config"
+	"github.com/Abraxas-365/divi/pkg/diveinspect/diveinspectcontainer"
 	"github.com/Abraxas-365/divi/pkg/fsx"
 	"github.com/Abraxas-365/divi/pkg/fsx/fsxlocal"
 	"github.com/Abraxas-365/divi/pkg/fsx/fsxs3"
-	"github.com/Abraxas-365/divi/pkg/diveinspect/diveinspectcontainer"
 	"github.com/Abraxas-365/divi/pkg/iam/iamcontainer"
 	"github.com/Abraxas-365/divi/pkg/logx"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -25,8 +25,8 @@ type Container struct {
 	Config *config.Config
 
 	// Infrastructure
-	DB    *sqlx.DB
-	Redis *redis.Client
+	DB         *sqlx.DB
+	Redis      *redis.Client
 	FileSystem fsx.FileSystem
 	S3Client   *s3.Client
 
@@ -180,4 +180,27 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+} // ConsoleNotifier implements the NotificationService interface
+// by printing OTP codes to the terminal/console
+type ConsoleNotifier struct{}
+
+// NewConsoleNotifier creates a new console-based OTP notifier
+func NewConsoleNotifier() *ConsoleNotifier {
+	return &ConsoleNotifier{}
+}
+
+// SendOTP prints the OTP code to the terminal
+func (n *ConsoleNotifier) SendOTP(ctx context.Context, contact string, code string) error {
+	fmt.Println("\n" + repeatString("=", 60))
+	fmt.Println("📧 OTP NOTIFICATION (Console Output)")
+	fmt.Println(repeatString("=", 60))
+	fmt.Printf("📨 To: %s\n", contact)
+	fmt.Printf("🔐 Code: %s\n", code)
+	fmt.Println(repeatString("=", 60))
+	fmt.Println("⚠️  This is console output for development only")
+	fmt.Println("⚠️  In production, configure email service in config")
+	fmt.Println(repeatString("=", 60) + "\n")
+
+	logx.Infof("📧 OTP sent to %s: %s", contact, code)
+	return nil
 }
