@@ -53,7 +53,7 @@ func main() {
 		AppName:               "divi API",
 		DisableStartupMessage: true,
 		ErrorHandler:          globalErrorHandler(cfg),
-		BodyLimit:             10 * 1024 * 1024, // 10MB
+		BodyLimit:             50 * 1024 * 1024, // 50MB for photo uploads
 		IdleTimeout:           120,
 		EnablePrintRoutes:     false,
 	})
@@ -153,6 +153,11 @@ func registerRoutes(app *fiber.App, container *Container) {
 
 	container.IAM.InvitationHandlers.RegisterRoutes(protected, container.IAM.UnifiedAuthMiddleware)
 	logx.Info("  ✓ Invitation routes registered")
+
+	// ── DiveInspect Routes (open, no auth) ───────────────────────────────
+	diveinspectAPI := app.Group("/api/v1")
+	container.DiveInspect.Handlers.RegisterRoutes(diveinspectAPI)
+	logx.Info("  ✓ DiveInspect routes registered (open)")
 
 	// ── Module Routes (auto-injected by `manifesto add`) ─────────────────
 	// manifesto:route-registration
@@ -351,6 +356,8 @@ func printRouteSummary() {
 	logx.Info("   ├─ Passwordless: /auth/passwordless/*")
 	logx.Info("   ├─ API Keys: /api/v1/api-keys/*")
 	logx.Info("   ├─ Invitations: /api/v1/invitations/*")
+	logx.Info("   ├─ DiveInspect Vehicles: /api/v1/vehicles/*")
+	logx.Info("   ├─ DiveInspect Findings: /api/v1/findings/*")
 	logx.Info("   └─ API: /api/v1/*")
 }
 

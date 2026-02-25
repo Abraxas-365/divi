@@ -9,6 +9,7 @@ import (
 	"github.com/Abraxas-365/divi/pkg/fsx"
 	"github.com/Abraxas-365/divi/pkg/fsx/fsxlocal"
 	"github.com/Abraxas-365/divi/pkg/fsx/fsxs3"
+	"github.com/Abraxas-365/divi/pkg/diveinspect/diveinspectcontainer"
 	"github.com/Abraxas-365/divi/pkg/iam/iamcontainer"
 	"github.com/Abraxas-365/divi/pkg/logx"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -30,7 +31,8 @@ type Container struct {
 	S3Client   *s3.Client
 
 	// Bounded-context containers
-	IAM *iamcontainer.Container
+	IAM         *iamcontainer.Container
+	DiveInspect *diveinspectcontainer.Container
 	// manifesto:container-fields
 }
 
@@ -131,6 +133,11 @@ func (c *Container) initModules() {
 		Redis:       c.Redis,
 		Cfg:         c.Config,
 		OTPNotifier: NewConsoleNotifier(),
+	})
+
+	c.DiveInspect = diveinspectcontainer.New(diveinspectcontainer.Deps{
+		DB:         c.DB,
+		FileSystem: c.FileSystem,
 	})
 
 	// manifesto:module-init
