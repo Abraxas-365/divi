@@ -217,7 +217,7 @@ Rules:
 							OfImageURL: &openai.ChatCompletionContentPartImageParam{
 								ImageURL: openai.ChatCompletionContentPartImageImageURLParam{
 									URL:    imageURL,
-									Detail: shared.ImageURLDetailAuto,
+									Detail: "auto",
 								},
 							},
 						},
