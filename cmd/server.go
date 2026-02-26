@@ -65,16 +65,19 @@ func main() {
 	app.Get("/health", healthCheckHandler(container))
 	app.Get("/", infoHandler(cfg))
 
-	// 8. Register Routes
+	// 8. Serve uploaded files
+	app.Static("/uploads", "./uploads")
+
+	// 9. Register Routes
 	registerRoutes(app, container)
 
-	// 9. 404 Handler
+	// 10. 404 Handler
 	app.Use(notFoundHandler)
 
-	// 10. Print Route Summary
+	// 11. Print Route Summary
 	printRouteSummary()
 
-	// 11. Start Server with Graceful Shutdown
+	// 12. Start Server with Graceful Shutdown
 	startServer(app, cfg, cancel)
 }
 
@@ -137,6 +140,11 @@ func setupMiddleware(app *fiber.App, cfg *config.Config) {
 
 func registerRoutes(app *fiber.App, container *Container) {
 	logx.Info("📝 Registering routes...")
+	// ── DiveInspect Routes (open, no auth) ───────────────────────────────
+	diveinspectAPI := app.Group("/api/v1")
+	container.DiveInspect.Handlers.RegisterRoutes(diveinspectAPI)
+	logx.Info("  ✓ DiveInspect routes registered (open)")
+
 	// ── IAM Routes ───────────────────────────────────────────────────────
 	container.IAM.OAuthHandlers.RegisterRoutes(app)
 	logx.Info("  ✓ OAuth routes registered")
@@ -154,17 +162,11 @@ func registerRoutes(app *fiber.App, container *Container) {
 	container.IAM.InvitationHandlers.RegisterRoutes(protected, container.IAM.UnifiedAuthMiddleware)
 	logx.Info("  ✓ Invitation routes registered")
 
-	// ── DiveInspect Routes (open, no auth) ───────────────────────────────
-	diveinspectAPI := app.Group("/api/v1")
-	container.DiveInspect.Handlers.RegisterRoutes(diveinspectAPI)
-	logx.Info("  ✓ DiveInspect routes registered (open)")
-
 	// ── Module Routes (auto-injected by `manifesto add`) ─────────────────
 	// manifesto:route-registration
 
 	logx.Info("✅ All routes registered")
 }
-
 
 // ============================================================================
 // Handlers
@@ -358,6 +360,7 @@ func printRouteSummary() {
 	logx.Info("   ├─ Invitations: /api/v1/invitations/*")
 	logx.Info("   ├─ DiveInspect Vehicles: /api/v1/vehicles/*")
 	logx.Info("   ├─ DiveInspect Findings: /api/v1/findings/*")
+	logx.Info("   ├─ Uploads: /uploads/*")
 	logx.Info("   └─ API: /api/v1/*")
 }
 
