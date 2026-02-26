@@ -128,10 +128,12 @@ Only return the JSON object, no additional text.`, vehicle.Brand, vehicle.Model,
 	resp, err := s.llmClient.Chat(ctx, []llm.Message{
 		llm.NewSystemMessage("You are a precise vehicle specifications database. Return only valid JSON with factory specs for the given vehicle. Be accurate and use real data from manufacturer catalogs."),
 		llm.NewUserMessage(prompt),
-	}, llm.WithJSONMode(), llm.WithTemperature(0.1))
+	}, llm.WithJSONMode())
 	if err != nil {
+		logx.Errorf("AAAAAAAAaaa %v", err)
 		return nil, err
 	}
+	logx.Infof("Received specs response for vehicle %s: %s", vehicle.ID, resp.Message.Content)
 
 	var specsData struct {
 		EngineType        *string  `json:"engine_type"`
@@ -164,6 +166,7 @@ Only return the JSON object, no additional text.`, vehicle.Brand, vehicle.Model,
 	}
 
 	if err := json.Unmarshal([]byte(resp.Message.Content), &specsData); err != nil {
+		logx.Errorf("Failed to parse specs response for vehicle %s: %v. Response content: %s", vehicle.ID, err, resp.Message.Content)
 		return nil, fmt.Errorf("failed to parse specs response: %w", err)
 	}
 
@@ -216,40 +219,62 @@ func (s *EnrichmentService) enrichEquipment(ctx context.Context, vehicle *divein
 		trim = *vehicle.Trim
 	}
 
+	// FIX 1: Update prompt to explicitly ask for a "features" key inside an object.
+	// This is much more stable for LLM JSON mode than asking for a raw array.
 	prompt := fmt.Sprintf(`You are a vehicle equipment expert. List ALL standard equipment features for:
 
 Vehicle: %s %s %s %s %d
 
-Return a JSON array of equipment items grouped by category. Each item:
+Return a JSON object containing a "features" array. The structure must be:
 {
-  "category": "safety|comfort|infotainment|exterior|interior",
-  "feature_name": "string",
-  "feature_description": "string (brief description in Spanish)"
+  "features": [
+    {
+      "category": "safety|comfort|infotainment|exterior|interior",
+      "feature_name": "string",
+      "feature_description": "string (brief description in Spanish)"
+    }
+  ]
 }
 
 Include ALL standard features for this specific trim level. Be comprehensive.
-Only return the JSON array, no additional text.`, vehicle.Brand, vehicle.Model, version, trim, vehicle.Year)
+Only return the JSON object, no additional text.`, vehicle.Brand, vehicle.Model, version, trim, vehicle.Year)
 
 	resp, err := s.llmClient.Chat(ctx, []llm.Message{
-		llm.NewSystemMessage("You are a comprehensive vehicle equipment database. Return only valid JSON arrays with all standard equipment features for the given vehicle trim. Write descriptions in Spanish. Be thorough and accurate."),
+		llm.NewSystemMessage("You are a comprehensive vehicle equipment database. Return a valid JSON object with a 'features' list. Write descriptions in Spanish."),
 		llm.NewUserMessage(prompt),
 	}, llm.WithJSONMode(), llm.WithTemperature(0.1))
 	if err != nil {
 		return nil, err
 	}
 
-	var items []struct {
-		Category    string `json:"category"`
-		FeatureName string `json:"feature_name"`
-		Description string `json:"feature_description"`
+	// FIX 2: Create a wrapper struct to handle the root object
+	var responseWrapper struct {
+		Features []struct {
+			Category    string `json:"category"`
+			FeatureName string `json:"feature_name"`
+			Description string `json:"feature_description"`
+		} `json:"features"`
 	}
 
-	if err := json.Unmarshal([]byte(resp.Message.Content), &items); err != nil {
-		return nil, fmt.Errorf("failed to parse equipment response: %w", err)
+	// Try to unmarshal into the wrapper first (standard behavior)
+	if err := json.Unmarshal([]byte(resp.Message.Content), &responseWrapper); err != nil {
+		// FALLBACK: If the LLM ignored instructions and sent a raw array, try unmarshalling directly
+		// This handles the edge case where the LLM is stubborn.
+		var rawFeatures []struct {
+			Category    string `json:"category"`
+			FeatureName string `json:"feature_name"`
+			Description string `json:"feature_description"`
+		}
+		if errArray := json.Unmarshal([]byte(resp.Message.Content), &rawFeatures); errArray != nil {
+			// Return original error if both fail
+			logx.Errorf("Failed to parse equipment JSON. Content: %s", resp.Message.Content)
+			return nil, fmt.Errorf("failed to parse equipment response: %w", err)
+		}
+		responseWrapper.Features = rawFeatures
 	}
 
-	equipment := make([]diveinspect.VehicleEquipment, 0, len(items))
-	for _, item := range items {
+	equipment := make([]diveinspect.VehicleEquipment, 0, len(responseWrapper.Features))
+	for _, item := range responseWrapper.Features {
 		desc := item.Description
 		eq := diveinspect.VehicleEquipment{
 			VehicleID:          vehicle.ID,
